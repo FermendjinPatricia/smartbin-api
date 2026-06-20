@@ -3,6 +3,7 @@ const cors = require("cors");
 const dotenv = require("dotenv");
 const connectDB = require("./src/config/db");
 const userRoutes = require("./src/routes/userRoutes");
+const rewardRoutes = require("./src/routes/rewardRoutes");
 
 dotenv.config();
 
@@ -39,6 +40,7 @@ app.get("/api/health", (req, res) => {
 });
 
 app.use("/api/users", userRoutes);
+app.use("/api/rewards", rewardRoutes);
 
 app.listen(PORT, () => {
   console.log(`SmartBin API running on http://localhost:${PORT}`);
