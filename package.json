@@ -1,7 +1,7 @@
 {
   "name": "smartbin-api",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js"
@@ -18,9 +18,13 @@
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "firebase-admin": "^14.0.0",
-    "mongoose": "^9.7.1"
+    "mongoose": "^9.7.1",
+    "multer": "^2.2.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"
+  },
+  "engines": {
+  "node": "22.x"
   }
 }
