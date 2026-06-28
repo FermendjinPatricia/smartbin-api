@@ -128,6 +128,10 @@ function startCollectionReminders() {
       scheduledAt: { $lte: new Date() },
     });
 
+    if (due.length > 0) {
+      console.log(`[cron] ${due.length} scheduled collection(s) due`);
+    }
+
     for (const item of due) {
       try {
         const user = await User.findOne({ firebaseUid: item.firebaseUid });
@@ -135,7 +139,10 @@ function startCollectionReminders() {
         item.sent = true;
         await item.save();
 
-        if (!user?.fcmToken) continue;
+        if (!user?.fcmToken) {
+          console.log(`[cron] no FCM token for ${item.firebaseUid} — skipping push`);
+          continue;
+        }
 
         const label = COMPARTMENT_LABELS[item.compartmentType] || item.compartmentType;
         const title = "Reminder golire tomberon";
@@ -170,35 +177,38 @@ const ALERT_COOLDOWN_MS = 6 * 60 * 60 * 1000; // 6 hours
 
 async function sendFillAlert(binCode, compartment) {
   try {
-    const since = new Date(Date.now() - ALERT_COOLDOWN_MS);
-    const recentAlert = await Notification.findOne({
-      title: `${compartment.label} aproape plin`,
-      createdAt: { $gte: since },
-    });
-    if (recentAlert) return;
+    const users = await User.find({ registeredBins: binCode });
+    console.log(`[fillAlert] ${binCode}/${compartment.type} ${compartment.percent}% — ${users.length} user(s) registered`);
 
-    const users = await User.find({
-      registeredBins: binCode,
-      fcmToken: { $exists: true, $ne: "" },
-    });
+    const since = new Date(Date.now() - ALERT_COOLDOWN_MS);
+    const notifType = compartment.percent >= 95 ? "danger" : "warning";
+    const title = `${compartment.label} aproape plin`;
+    const message = `Compartimentul ${compartment.label} este ${compartment.percent}% plin și trebuie golit.`;
 
     for (const user of users) {
-      const notifType = compartment.percent >= 95 ? "danger" : "warning";
-      const title = `${compartment.label} aproape plin`;
-      const message = `Compartimentul ${compartment.label} este ${compartment.percent}% plin și trebuie golit.`;
-
-      await Notification.create({
+      const recentAlert = await Notification.findOne({
         firebaseUid: user.firebaseUid,
         title,
-        message,
-        type: notifType,
+        createdAt: { $gte: since },
       });
+      if (recentAlert) {
+        console.log(`[fillAlert] skipped ${user.firebaseUid} — already notified within 6h`);
+        continue;
+      }
+
+      await Notification.create({ firebaseUid: user.firebaseUid, title, message, type: notifType });
+
+      if (!user.fcmToken) {
+        console.log(`[fillAlert] no FCM token for ${user.firebaseUid} — skipping push`);
+        continue;
+      }
 
       await admin.messaging().send({
         token: user.fcmToken,
         notification: { title: `SmartBin · ${title}`, body: message },
         data: { type: "fill_alert", compartment: compartment.type, percent: String(compartment.percent) },
       });
+      console.log(`[fillAlert] push sent to ${user.firebaseUid}`);
     }
   } catch (error) {
     console.error("sendFillAlert error:", error);
