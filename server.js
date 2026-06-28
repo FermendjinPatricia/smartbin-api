@@ -3,6 +3,7 @@ dotenv.config();
 
 const express = require("express");
 const cors = require("cors");
+const mongoose = require("mongoose");
 const cron = require("node-cron");
 const connectDB = require("./src/config/db");
 const userRoutes = require("./src/routes/userRoutes");
@@ -21,11 +22,27 @@ connectDB();
 const app = express();
 
 const PORT = process.env.PORT || 5000;
-const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:5173";
+
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  ...(process.env.CLIENT_URL || "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
+];
 
 app.use(
   cors({
-    origin: CLIENT_URL,
+    origin(origin, callback) {
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`Not allowed by CORS: ${origin}`));
+    },
     credentials: true,
   })
 );
@@ -40,10 +57,13 @@ app.get("/", (req, res) => {
 });
 
 app.get("/api/health", (req, res) => {
+  const databaseState =
+    mongoose.connection.readyState === 1 ? "connected" : "disconnected";
+
   res.json({
     status: "ok",
     service: "smartbin-api",
-    database: "connected",
+    database: databaseState,
     timestamp: new Date().toISOString(),
   });
 });
@@ -55,8 +75,8 @@ app.use("/api/scan", scanRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/schedule", scheduleRoutes);
 
-app.listen(PORT, () => {
-  console.log(`SmartBin API running on http://localhost:${PORT}`);
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`SmartBin API running on port ${PORT}`);
   startBinWatcher();
   startCollectionReminders();
 });
