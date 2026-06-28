@@ -47,6 +47,11 @@ const userSchema = new mongoose.Schema(
       type: [String],
       default: ["SB-2026-1947"],
     },
+
+    fcmToken: {
+      type: String,
+      default: "",
+    },
   },
   {
     timestamps: true,

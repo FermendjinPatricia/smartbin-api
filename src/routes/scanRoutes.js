@@ -5,6 +5,8 @@ const AnthropicModule = require("@anthropic-ai/sdk");
 const Anthropic = AnthropicModule.default ?? AnthropicModule;
 const User = require("../models/User");
 const ScanHistory = require("../models/ScanHistory");
+const Notification = require("../models/Notification");
+const admin = require("../config/firebaseAdmin");
 
 const router = express.Router();
 
@@ -147,6 +149,25 @@ Dacă nu poți identifica un deșeu clar, clasifică ca "general" / "Menajer".`,
       { $inc: { points: pointsAwarded } },
       { new: true }
     );
+
+    // Save notification + send FCM push
+    const notifTitle = "Scanare reușită!";
+    const notifMessage = `${aiResult.label} → ${aiResult.compartment} · +${pointsAwarded} puncte adăugate.`;
+
+    await Notification.create({
+      firebaseUid,
+      title: notifTitle,
+      message: notifMessage,
+      type: "reward",
+    });
+
+    if (updatedUser?.fcmToken) {
+      admin.messaging().send({
+        token: updatedUser.fcmToken,
+        notification: { title: `SmartBin · ${notifTitle}`, body: notifMessage },
+        data: { type: "scan_reward", points: String(pointsAwarded) },
+      }).catch((err) => console.error("FCM scan notification error:", err));
+    }
 
     res.json({
       label: aiResult.label,
