@@ -166,8 +166,17 @@ function startCollectionReminders() {
   console.log("Collection reminder scheduler started");
 }
 
+const ALERT_COOLDOWN_MS = 6 * 60 * 60 * 1000; // 6 hours
+
 async function sendFillAlert(binCode, compartment) {
   try {
+    const since = new Date(Date.now() - ALERT_COOLDOWN_MS);
+    const recentAlert = await Notification.findOne({
+      title: `${compartment.label} aproape plin`,
+      createdAt: { $gte: since },
+    });
+    if (recentAlert) return;
+
     const users = await User.find({
       registeredBins: binCode,
       fcmToken: { $exists: true, $ne: "" },
